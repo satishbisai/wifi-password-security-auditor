@@ -1,0 +1,69 @@
+"""Audit a Wi-Fi password locally without storing or transmitting it."""
+import getpass
+import re
+import secrets
+import string
+COMMON_PASSWORDS = {
+    "password", "password123", "12345678", "123456789",
+    "qwerty123", "admin123", "letmein123",
+}
+def audit(password: str) -> tuple[int, list[str]]:
+    score = 0
+    suggestions = []
+
+    if len(password) >= 16:
+        score += 2
+    elif len(password) >= 12:
+        score += 1
+    else:
+        suggestions.append("Use at least 12 characters; 16 or more is better.")
+	checks = [
+        (r"[a-z]", "Add lowercase letters."),
+        (r"[A-Z]", "Add uppercase letters."),
+        (r"\d", "Add numbers."),
+        (r"[^A-Za-z0-9]", "Add symbols."),
+    ]
+    for pattern, suggestion in checks:
+        if re.search(pattern, password):
+            score += 1
+        else:
+            suggestions.append(suggestion)
+    if password.lower() in COMMON_PASSWORDS:
+        score = 0
+        suggestions.append("This is a commonly used password; choose a different one.")
+    if len(set(password)) < max(4, len(password) // 3):
+        score -= 1
+        suggestions.append("Avoid repeated characters or predictable patterns.")
+    return max(0, min(score, 6)), suggestions
+def strength_label(score: int) -> str:
+    if score <= 2:
+        return "Weak"
+    if score <= 4:
+        return "Fair"
+    return "Strong"
+def generate_password(length: int = 20) -> str:
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*()-_=+"
+    while True:
+        password = "".join(secrets.choice(alphabet) for _ in range(length))
+        if (
+            re.search(r"[a-z]", password)
+            and re.search(r"[A-Z]", password)
+            and re.search(r"\d", password)
+            and re.search(r"[^A-Za-z0-9]", password)
+        ):
+            return password
+
+def main() -> None:
+    password = getpass.getpass("Enter Wi-Fi password (input hidden): ")
+    score, suggestions = audit(password)
+    print(f"\nStrength: {strength_label(score)} ({score}/6)")
+    if suggestions:
+        print("Suggestions:")
+        for suggestion in suggestions:
+            print(f"  - {suggestion}")
+    else:
+        print("Good length and character variety.")
+    if input("\nGenerate a random replacement? [y/N] ").strip().lower() == "y":
+        print(f"Suggested password: {generate_password()}")
+if __name__ == "__main__":
+    main()
